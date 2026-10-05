@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lifting Plan: ตรวจแผนการยกและจำลอง 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1F3F2; --surface:#FFFFFF; --field:#F6F8F8;
+  --ink:#1B2730; --ink-2:#51606B; --line:#D3DADE;
+  --accent:#2B6489; --accent-ink:#FFFFFF;
+  --pass:#1F6B45; --pass-bg:#DDF0E5;
+  --warn:#845400; --warn-bg:#FAE8C2;
+  --fail:#A5302A; --fail-bg:#F8DCD8;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11181D; --surface:#1A242B; --field:#131C22;
+    --ink:#E6ECEF; --ink-2:#9AA9B3; --line:#2E3B44;
+    --accent:#6DB1D8; --accent-ink:#0E1A21;
+    --pass:#6BCB9A; --pass-bg:#16321F;
+    --warn:#E8B64F; --warn-bg:#38290D;
+    --fail:#F08A80; --fail-bg:#3C1A17;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11181D; --surface:#1A242B; --field:#131C22;
+  --ink:#E6ECEF; --ink-2:#9AA9B3; --line:#2E3B44;
+  --accent:#6DB1D8; --accent-ink:#0E1A21;
+  --pass:#6BCB9A; --pass-bg:#16321F;
+  --warn:#E8B64F; --warn-bg:#38290D;
+  --fail:#F08A80; --fail-bg:#3C1A17;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Thai','Noto Sans Thai','Sarabun',system-ui,sans-serif;font-size:15px;line-height:1.55;font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 14px 56px}
+h1{font-size:1.45rem;font-weight:600;margin:0 0 4px;line-height:1.3}
+h2{font-size:1.05rem;font-weight:600;margin:0 0 10px}
+h3{font-size:.95rem;font-weight:600;margin:16px 0 4px}
+.sub{color:var(--ink-2);margin:0 0 14px;max-width:70ch}
+.muted{color:var(--ink-2)} .small{font-size:.85rem}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:10px 13px;font:inherit;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chip{font:inherit;font-size:.86rem;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:6px 13px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+@media (min-width:861px){.sticky{position:sticky;top:calc(10px + env(safe-area-inset-top,0px));max-height:calc(100vh - 20px);overflow:auto;padding-right:2px}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.panel + .panel{margin-top:14px}
+
+details.sec{border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:10px}
+details.sec > summary{cursor:pointer;padding:12px 14px;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+details.sec > summary::-webkit-details-marker{display:none}
+details.sec > summary::after{content:"+";color:var(--ink-2);font-weight:400;font-size:1.2rem}
+details.sec[open] > summary::after{content:"–"}
+details.sec .body{padding:0 14px 12px}
+.field{display:grid;grid-template-columns:1fr 118px;gap:2px 12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.field:last-child{border-bottom:0}
+.field .hint{display:block;color:var(--ink-2);font-size:.8rem;line-height:1.35}
+.field.wide{grid-template-columns:1fr}
+.field .slide{grid-column:1/-1;margin-top:2px}
+.inp{display:flex;align-items:center;gap:6px}
+.inp .unit{color:var(--ink-2);font-size:.85rem;min-width:26px}
+input[type="text"],input[type="number"],input[type="date"],select{width:100%;min-width:0;font:inherit;padding:8px 9px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:6px;text-align:right}
+input[type="text"],input[type="date"],select{text-align:left}
+input[type="range"]{width:100%;accent-color:var(--accent);margin:0;height:28px}
+input[type="checkbox"]{width:22px;height:22px;accent-color:var(--accent);flex:none}
+
+.btn{font:inherit;font-size:.9rem;background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);border-radius:6px;padding:9px 14px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.sm{padding:5px 10px;font-size:.82rem}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin:6px 0 4px}
+.seg button{font:inherit;font-size:.86rem;background:var(--field);color:var(--ink);border:0;padding:7px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+.badge{display:inline-block;font-size:.82rem;font-weight:600;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.badge.pass{background:var(--pass-bg);color:var(--pass)} .badge.warn{background:var(--warn-bg);color:var(--warn)} .badge.fail{background:var(--fail-bg);color:var(--fail)}
+
+.verdict{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.verdict.pass{background:var(--pass-bg);color:var(--pass)} .verdict.warn{background:var(--warn-bg);color:var(--warn)} .verdict.fail{background:var(--fail-bg);color:var(--fail)}
+.verdict .big{font-size:2.3rem;font-weight:600;line-height:1}
+.verdict .vt{font-weight:600;font-size:1.05rem}
+.verdict .vs{font-size:.85rem;opacity:.9}
+.gauge{position:relative;height:14px;background:var(--field);border:1px solid var(--line);border-radius:7px;margin:6px 0 24px}
+.gauge .fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px 0 0 6px}
+.gauge .fill.pass{background:var(--pass)} .gauge .fill.warn{background:var(--warn)} .gauge .fill.fail{background:var(--fail)}
+.gauge .mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.gauge .mark span{position:absolute;top:100%;left:50%;transform:translateX(-50%);font-size:.75rem;color:var(--ink-2);white-space:nowrap;padding-top:2px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:0}
+.kv dt{color:var(--ink-2)} .kv dd{margin:0;text-align:right;font-weight:500}
+.checks{list-style:none;margin:0;padding:0}
+.checks li{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;padding:8px 0;border-top:1px solid var(--line);align-items:start}
+.checks .name{font-weight:500} .checks .msg{grid-column:2;color:var(--ink-2);font-size:.88rem}
+
+.viewer-wrap{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:linear-gradient(var(--field),var(--surface))}
+#viewer{width:100%;height:340px;position:relative}
+@media (max-width:860px){#viewer{height:300px}}
+#viewer canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#viewer canvas:active{cursor:grabbing}
+.vpill{position:absolute;left:8px;top:8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:.8rem;pointer-events:none;opacity:.95}
+.vwarn{position:absolute;left:8px;right:8px;bottom:8px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:4px 9px;font-size:.8rem;pointer-events:none}
+.vctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.vctl input[type="range"]{flex:1 1 160px}
+.phase{font-size:.85rem;color:var(--ink-2);min-width:7.5em}
+
+.checklist{list-style:none;margin:0;padding:0}
+.checklist li{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+.checklist label{flex:1;cursor:pointer}
+.progress{height:10px;border-radius:5px;background:var(--field);border:1px solid var(--line);overflow:hidden;margin:8px 0 4px}
+.progress div{height:100%;background:var(--pass)}
+
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:700px}
+th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+th{font-weight:600;font-size:.85rem;color:var(--ink-2)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+@media (max-width:860px){.two{grid-template-columns:1fr}}
+.result-box{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:12px}
+.note{border-left:3px solid var(--line);padding:2px 0 2px 12px;color:var(--ink-2);font-size:.88rem;margin-top:12px}
+table.chart{min-width:0;margin:6px 0}
+table.chart th,table.chart td{padding:4px 6px;text-align:left}
+table.chart input{text-align:right}
+textarea{width:100%;font:inherit;font-size:.85rem;padding:8px;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:6px;min-height:130px}
+
+.sbar{display:none}
+@media (max-width:860px){
+  body{padding-bottom:76px}
+  .sbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;gap:10px;align-items:center;justify-content:space-between;background:var(--surface);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+}
+
+.sheet{background:#fff;color:#111;border:1px solid var(--line);border-radius:6px;padding:22px;max-width:820px;margin:0 auto}
+.sheet h2{font-size:1.2rem;margin:0 0 2px}
+.sheet table{min-width:0;font-size:.88rem}
+.sheet th,.sheet td{text-align:left;white-space:normal;border-bottom:1px solid #ccc;padding:5px 6px;color:#111}
+.sheet td.r{text-align:right}
+.sheet .sig{display:grid;grid-template-columns:repeat(2,1fr);gap:26px 30px;margin-top:26px}
+.sheet .sig div{border-top:1px solid #111;padding-top:4px;font-size:.85rem}
+.sheet img{width:100%;height:auto;border:1px solid #ccc;border-radius:4px;margin:8px 0}
+.sheet .st{font-weight:700}
+.sheet .st.pass{color:#1F6B45}.sheet .st.warn{color:#845400}.sheet .st.fail{color:#A5302A}
+[hidden]{display:none !important}
+@media (prefers-reduced-motion:no-preference){.gauge .fill{transition:width .2s ease}}
+@media print{
+  body{background:#fff}
+  .tabs,.sbar,.noprint,.chips,#panel-plan,#panel-check,#panel-aux,#panel-cmp,.wrap > h1,.wrap > .sub{display:none !important}
+  #panel-sheet{display:block !important}
+  .sheet{border:0;padding:0;max-width:none}
+  .wrap{padding:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lifting Plan: ตรวจแผนการยกและจำลอง 3D</h1>
+  <p class="sub">ใช้ได้กับงานยกทั่วไปด้วยเครนเคลื่อนที่ กรอกค่า ดูผ่าน/ไม่ผ่านทันที และดูภาพจำลองการยกเทียบกับอาคาร ค่าพิกัดยกต้องมาจาก Load Chart ของเครนที่ใช้จริง ตัวอย่างในหน้านี้เป็นค่าสมมติ</p>
+
+  <div class="tabs" role="tablist" aria-label="เมนูเครื่องมือ">
+    <button class="tab" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="true">คำนวณและจำลอง</button>
+    <button class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Checklist ก่อนยก</button>
+    <button class="tab" role="tab" id="tab-aux" aria-controls="panel-aux" aria-selected="false">แผ่นเหล็ก / แผ่นรองขา</button>
+    <button class="tab" role="tab" id="tab-cmp" aria-controls="panel-cmp" aria-selected="false">เปรียบเทียบแผน</button>
+    <button class="tab" role="tab" id="tab-sheet" aria-controls="panel-sheet" aria-selected="false">ใบแผนการยก</button>
+  </div>
+
+  <!-- ===== คำนวณและจำลอง ===== -->
+  <section id="panel-plan" role="tabpanel" aria-labelledby="tab-plan">
+    <div class="chips" id="presets" role="group" aria-label="เลือกตัวอย่างเริ่มต้น"></div>
+    <div class="grid">
+      <div id="inputs">
+        <details class="sec" open><summary>1. งานและเครน</summary><div class="body" id="sec-work"></div></details>
+        <details class="sec" open><summary>2. รูปทรงการยก</summary><div class="body" id="sec-geom"></div></details>
+        <details class="sec" open><summary>3. น้ำหนักที่ยก</summary><div class="body" id="sec-weight"></div></details>
+        <details class="sec" open><summary>4. พิกัดยกของเครน</summary><div class="body" id="sec-cap"></div></details>
+        <details class="sec"><summary>5. อาคารและหน้างาน (ใช้ในภาพ 3D)</summary><div class="body" id="sec-bld"></div></details>
+        <details class="sec"><summary>6. ข้อมูลโครงการและผู้ปฏิบัติงาน (ใช้ในใบแผน)</summary><div class="body" id="sec-proj"></div></details>
+      </div>
+      <div class="sticky">
+        <div class="panel" id="results" aria-live="polite"></div>
+        <div class="panel">
+          <h2>จำลองการยก 3 มิติ</h2>
+          <div class="viewer-wrap">
+            <div id="viewer" aria-label="ภาพจำลอง 3 มิติของเครน อาคาร และชิ้นงาน"></div>
+            <div class="vpill" id="vpill"></div>
+            <div class="vwarn" id="vwarn" hidden></div>
+          </div>
+          <div class="vctl">
+            <button class="btn sm" id="v-play">เล่น</button>
+            <button class="btn ghost sm" id="v-reset">เริ่มใหม่</button>
+            <input type="range" id="v-scrub" min="0" max="1000" value="0" aria-label="ตำแหน่งในภาพจำลอง">
+            <span class="phase" id="v-phase"></span>
+          </div>
+          <div class="vctl">
+            <span class="muted small">มุมมอง</span>
+            <button class="btn ghost sm" data-cam="iso">เฉียง</button>
+            <button class="btn ghost sm" data-cam="side">ด้านข้าง</button>
+            <button class="btn ghost sm" data-cam="top">ด้านบน</button>
+            <span class="muted small">ลากเพื่อหมุน ใช้นิ้วหรือล้อเมาส์เพื่อซูม</span>
+          </div>
+          <p class="muted small" style="margin:8px 0 0">ภาพเป็นแบบจำลองเชิงรูปทรงเพื่อสื่อสารหน้างาน ไม่ใช่ Range Diagram ของเครน เส้นแดงวงกลมคือแนวกั้นเขตห้ามเข้า</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Checklist ===== -->
+  <section id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden>
+    <div class="panel" style="max-width:760px">
+      <h2>Checklist ก่อนยก</h2>
+      <p class="muted small" style="margin-top:0">ติ๊กทีละข้อก่อนเริ่มยกทุกครั้ง ผลจะรวมอยู่ในแถบสถานะและใบแผนการยก เพิ่มข้อของหน้างานเองได้</p>
+      <div class="progress" aria-hidden="true"><div id="ck-bar" style="width:0%"></div></div>
+      <div class="small muted" id="ck-count" role="status"></div>
+      <ul class="checklist" id="ck-list"></ul>
+      <div class="row">
+        <input type="text" id="ck-new" placeholder="เพิ่มข้อตรวจสอบของหน้างาน" style="flex:1 1 220px" aria-label="ข้อตรวจสอบใหม่">
+        <button class="btn ghost" id="ck-add">เพิ่มข้อ</button>
+        <button class="btn ghost" id="ck-clear">ล้างเครื่องหมายทั้งหมด</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== แผ่นเหล็ก / แผ่นรองขา ===== -->
+  <section id="panel-aux" role="tabpanel" aria-labelledby="tab-aux" hidden>
+    <div class="two">
+      <div class="panel">
+        <h2>น้ำหนักแผ่นเหล็ก</h2>
+        <p class="muted small" style="margin-top:0">ใช้หาน้ำหนักแผ่นเหล็กที่ยกหรือที่ใช้เป็นอุปกรณ์ช่วยยก</p>
+        <div id="plate-inputs"></div>
+        <div class="result-box" id="plate-result" aria-live="polite"></div>
+        <div class="row">
+          <button class="btn ghost sm" id="plate-to-other">ใส่เป็นน้ำหนักอื่น</button>
+          <button class="btn ghost sm" id="plate-to-piece">ใส่เป็นน้ำหนักชิ้นงาน</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>แรงดันใต้แผ่นรองขาเครน</h2>
+        <p class="muted small" style="margin-top:0">ตรวจว่าแผ่นรองใหญ่พอสำหรับดินที่รับน้ำหนักได้ ใส่แรงที่ขายันสูงสุดจากคู่มือเครน และค่าที่ดินรับได้จากผู้ออกแบบหรือผลทดสอบดิน</p>
+        <div id="bear-inputs"></div>
+        <div class="result-box" id="bear-result" aria-live="polite"></div>
+        <div class="note">ยังไม่รวมน้ำหนักแผ่นรองเอง และไม่ได้คิดกรณีดินอ่อนหรือขอบหลุม ให้วิศวกรตรวจสอบก่อนใช้งานจริง</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== เปรียบเทียบ ===== -->
+  <section id="panel-cmp" role="tabpanel" aria-labelledby="tab-cmp" hidden>
+    <div class="panel">
+      <h2>เปรียบเทียบแผน</h2>
+      <p class="muted small" style="margin-top:0">กด "เพิ่มเข้าตารางเปรียบเทียบ" ในหน้าคำนวณเพื่อเก็บแผนไว้ที่นี่ แผนที่เก็บจะอยู่ในเบราว์เซอร์เครื่องนี้ ถ้าเบราว์เซอร์ไม่อนุญาตจะอยู่จนกว่าจะปิดหน้านี้</p>
+      <div class="scroll"><table id="cmp-table"></table></div>
+    </div>
+  </section>
+
+  <!-- ===== ใบแผนการยก ===== -->
+  <section id="panel-sheet" role="tabpanel" aria-labelledby="tab-sheet" hidden>
+    <div class="row noprint" style="margin:0 0 12px">
+      <button class="btn" id="btn-print">พิมพ์ / บันทึกเป็น PDF</button>
+      <button class="btn ghost" id="btn-copy2">คัดลอกสรุปเป็นข้อความ</button>
+      <span class="muted small" id="print-msg" role="status"></span>
+    </div>
+    <div id="copy-fallback" class="noprint" hidden><p class="muted small">เบราว์เซอร์ไม่อนุญาตให้คัดลอกอัตโนมัติ เลือกข้อความด้านล่างแล้วคัดลอกเอง</p><textarea id="copy-text" readonly></textarea></div>
+    <div class="sheet" id="sheet"></div>
+  </section>
+</div>
+
+<div class="sbar" id="sbar" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ================= ข้อมูลตั้งต้น ================= */
+var TODAY = (function(){ try { return new Date().toISOString().slice(0,10); } catch(e){ return ''; } })();
+var DEFAULTS = {
+  name:'', crane:'',
+  R:14, zPlace:14, pieceH:2, riggingH:1.5, margin:3, L:28, theta:60, pivot:2.5, swing:120,
+  wind:0, windLimit:10, clearReq:1,
+  wPiece:2000, wHook:150, wSling:100, wBeam:0, wOther:0,
+  loadL:2, loadW:1.2,
+  capMode:'manual', rated:0, chart:[], limit:75, tol:2.5,
+  bOn:true, floors:4, floorH:3.5, bDist:8, bDepth:12, bW:20,
+  pName:'', pContract:'', pSite:'', pDate:TODAY, planner:'', cCtl:'', cOp:'', cRig:'', cSig:''
+};
+var PRESETS = [
+  {id:'demo', label:'ตัวอย่างทั่วไป: ยกขึ้นหลังคาอาคาร', data:{name:'ยกอุปกรณ์ขึ้นหลังคาอาคาร (ตัวอย่าง)', crane:'เครนเคลื่อนที่ (ตัวอย่าง)', rated:3500}},
+  {id:'site', label:'ตัวอย่าง: ยกตู้สำนักงานสนาม', data:{name:'ยกตู้สำนักงานสนาม', crane:'Truck crane', R:8, zPlace:2.6, pieceH:2.6, riggingH:5.9, margin:3, L:16.9, theta:60, wPiece:1200, wHook:0, wSling:0, rated:8350, loadL:6, loadW:2.4, bOn:false}},
+  {id:'mat', label:'ตัวอย่าง: ยกวัสดุขึ้นที่สูง', data:{name:'ยกวัสดุขึ้นที่สูง', crane:'Mobile crane 50 t', R:22, zPlace:16, pieceH:1, riggingH:0, margin:3, L:40, theta:60, wPiece:1800, wHook:150, wSling:100, rated:2850, loadL:3, loadW:1.2, floors:5, floorH:3.2, bDist:14, bDepth:14, bW:24}},
+  {id:'pole', label:'ตัวอย่าง: ปักเสา', data:{name:'ปักเสา', crane:'Mobile crane 50 t', R:15, zPlace:11, pieceH:1, riggingH:0, margin:3, L:41.12, theta:70, wPiece:2100, wHook:150, wSling:100, rated:4700, loadL:1, loadW:1, bOn:false}},
+  {id:'gis', label:'ตัวอย่าง: ยกตู้อุปกรณ์ไฟฟ้า', data:{name:'ยกตู้อุปกรณ์ไฟฟ้า', crane:'Mobile crane 50 t', R:16, zPlace:6, pieceH:5, riggingH:0, margin:3, L:25.4, theta:70, wPiece:1840, wHook:150, wSling:100, rated:4700, loadL:2.4, loadW:1.2, floors:2, floorH:3, bDist:12, bDepth:10, bW:16}}
+];
+var CHECKS_DEFAULT = [
+  'ตรวจสภาพเครน สลิง และอุปกรณ์ช่วยยกก่อนใช้งาน และติด Tag สถานะ',
+  'พื้นที่ตั้งเครนราบ แน่น รับน้ำหนักได้ และปูแผ่นรองใต้ขายัน',
+  'กางขายันสุดระยะ ปรับระดับเครนแล้ว',
+  'ยืนยันน้ำหนักชิ้นงานจริงและจุดผูกยก',
+  'กั้นเขตห้ามเข้าใต้แนวยกและรอบพื้นที่หมุนบูม',
+  'ผู้ควบคุม ผู้บังคับเครน ผู้ยึดเกาะ และผู้ให้สัญญาณพร้อม สื่อสารกันได้',
+  'ตรวจระยะห่างจากสายไฟฟ้าและสิ่งกีดขวางตลอดแนวหมุนบูม',
+  'ตรวจสภาพอากาศ ลม และฝนก่อนเริ่มและระหว่างยก',
+  'ประชุมสั้นเรื่องความปลอดภัยกับทีมก่อนเริ่มยก',
+  'ยกทดสอบให้พ้นพื้นเล็กน้อย หยุดตรวจการทรงตัว แล้วจึงยกต่อ'
+];
+
+/* ================= ตรรกะคำนวณ ================= */
+function num(v){ var n = parseFloat(v); return isFinite(n) ? n : 0; }
+function fmt(n, d){ if(d === undefined) d = 2; return Number(n).toLocaleString('en-US', {maximumFractionDigits:d}); }
+function chartLookup(chart, R){
+  var rows = (chart || []).map(function(r){ return {r:num(r.r), cap:num(r.cap)}; })
+    .filter(function(r){ return r.r > 0 && r.cap > 0; })
+    .sort(function(a,b){ return a.r - b.r; });
+  for(var i = 0; i < rows.length; i++){ if(rows[i].r >= R) return rows[i]; }
+  return null;
+}
+function calc(s){
+  var z = num(s.zPlace), pieceH = num(s.pieceH), rigH = num(s.riggingH), margin = num(s.margin);
+  var H = z + pieceH + rigH + margin;
+  var rig = num(s.wHook) + num(s.wSling) + num(s.wBeam) + num(s.wOther);
+  var W = num(s.wPiece) + rig;
+  var L = num(s.L), thDeg = num(s.theta), R = num(s.R), piv = num(s.pivot), tol = num(s.tol), limit = num(s.limit);
+  var rated = num(s.rated), ratedNote = '', chartMiss = false;
+  if(s.capMode === 'chart'){
+    var hit = chartLookup(s.chart, R);
+    if(hit){ rated = hit.cap; ratedNote = 'อ่านจาก Load Chart ที่รัศมี ' + fmt(hit.r) + ' m (ค่าที่ไม่น้อยกว่ารัศมีใช้งาน เพื่อให้ปลอดภัยไว้ก่อน)'; }
+    else { rated = 0; chartMiss = true; }
+  }
+  var rate = rated > 0 ? W / rated * 100 : null;
+  var allow = rated * limit / 100;
+  var geomOk = L > 0 && thDeg > 0 && thDeg < 90;
+  var thetaEff = (L > 0 && R >= 0 && R <= L) ? Math.acos(R / L) * 180 / Math.PI : null;
+  var reach = L * Math.cos(thDeg * Math.PI / 180);
+  var tipEntered = piv + L * Math.sin(thDeg * Math.PI / 180);
+  var tipEff = thetaEff !== null ? piv + L * Math.sin(thetaEff * Math.PI / 180) : tipEntered;
+  var tipH = Math.min(tipEntered, tipEff);
+  var thDraw = thetaEff !== null ? thetaEff : (geomOk ? thDeg : 60);
+  var Rdraw = L > 0 ? L * Math.cos(thDraw * Math.PI / 180) : R;
+  var Hb = s.bOn ? num(s.floors) * num(s.floorH) : 0;
+  var bDist = num(s.bDist);
+  var crossing = !!s.bOn && geomOk && Rdraw > bDist;
+  var clearance = piv + bDist * Math.tan(thDraw * Math.PI / 180) - Hb;
+  var checks = [];
+
+  if(chartMiss){
+    checks.push({st:'fail', name:'น้ำหนักยกเทียบพิกัดยก', msg:'รัศมี ' + fmt(R) + ' m เกินช่วงรัศมีใน Load Chart ที่กรอก หรือยังไม่ได้กรอก ห้ามประมาณค่าเอง'});
+  } else if(rate === null){
+    checks.push({st:'warn', name:'น้ำหนักยกเทียบพิกัดยก', msg:'ยังไม่ได้ใส่พิกัดยกจาก Load Chart ของเครน'});
+  } else if(rate <= limit){
+    checks.push({st:'pass', name:'น้ำหนักยกเทียบพิกัดยก', msg:'น้ำหนักรวม ' + fmt(W) + ' kg คิดเป็น ' + fmt(rate) + '% ของพิกัดยก ไม่เกินเกณฑ์ ' + fmt(limit) + '%'});
+  } else if(rate <= 100){
+    checks.push({st:'fail', name:'น้ำหนักยกเทียบพิกัดยก', msg:'น้ำหนักรวม ' + fmt(rate) + '% ยังไม่เกินพิกัดยก แต่เกินเกณฑ์ ' + fmt(limit) + '% ต้องลดน้ำหนักหรือเปลี่ยนเครน'});
+  } else {
+    checks.push({st:'fail', name:'น้ำหนักยกเทียบพิกัดยก', msg:'น้ำหนักรวม ' + fmt(rate) + '% เกินพิกัดยกของเครน ห้ามยก'});
+  }
+
+  if(!geomOk){
+    checks.push({st:'warn', name:'ความสูงปลายบูม', msg:'กรอกความยาวบูมและองศา (มากกว่า 0 และน้อยกว่า 90) เพื่อตรวจ'});
+    checks.push({st:'warn', name:'รัศมีกับรูปทรงบูม', msg:'กรอกความยาวบูมและองศาเพื่อตรวจ'});
+  } else {
+    if(tipH >= H) checks.push({st:'pass', name:'ความสูงปลายบูม', msg:'ปลายบูมสูงประมาณ ' + fmt(tipH) + ' m ไม่ต่ำกว่า Lifting Height ' + fmt(H) + ' m'});
+    else checks.push({st:'fail', name:'ความสูงปลายบูม', msg:'ปลายบูมสูงประมาณ ' + fmt(tipH) + ' m ต่ำกว่า Lifting Height ' + fmt(H) + ' m ต้องเพิ่มมุมหรือความยาวบูม'});
+    if(R > L) checks.push({st:'fail', name:'รัศมีกับรูปทรงบูม', msg:'Working radius ' + fmt(R) + ' m เกินความยาวบูม ' + fmt(L) + ' m'});
+    else if(Math.abs(R - reach) <= tol) checks.push({st:'pass', name:'รัศมีกับรูปทรงบูม', msg:'บูม ' + fmt(L) + ' m ที่ ' + fmt(thDeg) + '° ยื่นได้ประมาณ ' + fmt(reach) + ' m สอดคล้องกับรัศมี ' + fmt(R) + ' m'});
+    else checks.push({st:'warn', name:'รัศมีกับรูปทรงบูม', msg:'บูม ' + fmt(L) + ' m ที่ ' + fmt(thDeg) + '° ยื่นได้ประมาณ ' + fmt(reach) + ' m แต่ระบุรัศมี ' + fmt(R) + ' m ที่รัศมีนี้มุมควรอยู่ราว ' + fmt(thetaEff, 1) + '° ตรวจค่าที่อ่านจาก Load Chart อีกครั้ง'});
+  }
+
+  if(s.bOn){
+    var need = num(s.clearReq);
+    if(!geomOk) checks.push({st:'warn', name:'ระยะพ้นอาคาร', msg:'กรอกความยาวบูมและองศาเพื่อตรวจ'});
+    else if(!crossing) checks.push({st:'pass', name:'ระยะพ้นอาคาร', msg:'บูมไม่พาดผ่านด้านหน้าอาคาร (อาคารเริ่มที่ ' + fmt(bDist) + ' m ส่วนบูมยื่นถึง ' + fmt(Rdraw) + ' m)'});
+    else if(clearance >= need) checks.push({st:'pass', name:'ระยะพ้นอาคาร', msg:'บูมพ้นขอบอาคารประมาณ ' + fmt(clearance) + ' m ไม่น้อยกว่าที่ต้องการ ' + fmt(need) + ' m'});
+    else if(clearance >= 0) checks.push({st:'warn', name:'ระยะพ้นอาคาร', msg:'บูมพ้นขอบอาคารเพียงประมาณ ' + fmt(clearance) + ' m น้อยกว่าที่ต้องการ ' + fmt(need) + ' m'});
+    else checks.push({st:'fail', name:'ระยะพ้นอาคาร', msg:'บูมต่ำกว่าขอบอาคารประมาณ ' + fmt(-clearance) + ' m จะชนอาคาร ให้ถอยเครนออกหรือเพิ่มมุมบูม'});
+  }
+
+  var wind = num(s.wind), wl = num(s.windLimit);
+  if(wl > 0 && wind > 0){
+    if(wind <= wl) checks.push({st:'pass', name:'ความเร็วลม', msg:'ลม ' + fmt(wind) + ' m/s ไม่เกินที่กำหนด ' + fmt(wl) + ' m/s'});
+    else checks.push({st:'fail', name:'ความเร็วลม', msg:'ลม ' + fmt(wind) + ' m/s เกินที่กำหนด ' + fmt(wl) + ' m/s ห้ามยก'});
+  }
+
+  var order = {pass:0, warn:1, fail:2};
+  var overall = checks.reduce(function(a, c){ return order[c.st] > order[a] ? c.st : a; }, 'pass');
+  return {H:H, rig:rig, W:W, rated:rated, ratedNote:ratedNote, limit:limit, rate:rate, allow:allow, remaining:allow - W, maxPiece:allow - rig,
+          reach:reach, tipH:tipH, thetaEff:thetaEff, thDraw:thDraw, Rdraw:Rdraw, Hb:Hb, crossing:crossing, clearance:clearance,
+          geomOk:geomOk, checks:checks, overall:overall, chartMiss:chartMiss};
+}
+
+/* ================= สถานะ ================= */
+var STATUS_TEXT = {pass:'ผ่าน', warn:'ควรตรวจสอบ', fail:'ไม่ผ่าน'};
+function $(id){ return document.getElementById(id); }
+function esc(t){ return String(t).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
+var state = JSON.parse(JSON.stringify(DEFAULTS));
+Object.assign(state, PRESETS[0].data);
+var activePreset = 'demo';
+var userCases = [];
+var lastCalc = null;
+var checklist = CHECKS_DEFAULT.map(function(t){ return {t:t, done:false}; });
+var lastSnap = '';
+var STORE_STATE = 'lift_typ_state_v1', STORE_CASES = 'lift_typ_cases_v1';
+
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+var saveTimer = null;
+function autosave(){ clearTimeout(saveTimer); saveTimer = setTimeout(function(){ lsSet(STORE_STATE, JSON.stringify(state)); }, 400); }
+(function restore(){
+  var raw = lsGet(STORE_STATE);
+  if(raw){ try { var o = JSON.parse(raw); if(o && typeof o === 'object'){ state = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), o); if(!Array.isArray(state.chart)) state.chart = []; activePreset = ''; } } catch(e){} }
+  var rc = lsGet(STORE_CASES);
+  if(rc){ try { var a = JSON.parse(rc); if(Array.isArray(a)) userCases = a; } catch(e){} }
+})();
+function saveCases(){ lsSet(STORE_CASES, JSON.stringify(userCases)); }
+
+function ckProgress(){ var d = checklist.filter(function(c){ return c.done; }).length; return {done:d, total:checklist.length}; }
+function finalVerdict(c){
+  var p = ckProgress();
+  if(c.overall === 'fail') return {st:'fail', title:'ห้ามยก', sub:'ผลคำนวณมีข้อที่ไม่ผ่าน'};
+  if(c.overall === 'warn') return {st:'warn', title:'ตรวจสอบก่อนยก', sub:'ผลคำนวณมีข้อที่ต้องยืนยันเพิ่ม'};
+  if(p.done < p.total) return {st:'warn', title:'คำนวณผ่าน รอ Checklist', sub:'Checklist ก่อนยกครบ ' + p.done + ' จาก ' + p.total + ' ข้อ'};
+  return {st:'pass', title:'พร้อมยก', sub:'คำนวณผ่านและ Checklist ครบ'};
+}
+
+/* ================= ช่องกรอก ================= */
+var F_WORK = [
+  {k:'name', label:'ชื่องาน', type:'text', wide:true},
+  {k:'crane', label:'รุ่นเครน', type:'text', wide:true}
+];
+var F_GEOM = [
+  {k:'R', label:'Working radius', unit:'m', slide:[1,70,0.5], hint:'ระยะจากศูนย์กลางหมุนเครนถึงจุดวางชิ้นงาน'},
+  {k:'zPlace', label:'ความสูงจุดที่วาง', unit:'m', hint:'ระดับพื้นปลายทางเทียบพื้นที่ตั้งเครน'},
+  {k:'pieceH', label:'ความสูงชิ้นงาน', unit:'m'},
+  {k:'riggingH', label:'ความสูงอุปกรณ์ช่วยยก (สลิงถึงตะขอ)', unit:'m'},
+  {k:'margin', label:'ระยะเผื่อ', unit:'m', hint:'ระยะเผื่อเหนือจุดวางขณะเคลื่อนย้าย'},
+  {k:'L', label:'ความยาวบูม', unit:'m', slide:[5,80,0.1]},
+  {k:'theta', label:'องศาบูม', unit:'°', slide:[20,85,0.5]},
+  {k:'pivot', label:'ความสูงจุดหมุนบูมจากพื้น', unit:'m', hint:'ดูจากคู่มือเครน โดยทั่วไปราว 2 ถึง 3 m'},
+  {k:'swing', label:'มุมหมุนจากจุดยกไปจุดวาง', unit:'°', slide:[-180,180,5], hint:'ใช้ในภาพ 3D เท่านั้น'},
+  {k:'wind', label:'ความเร็วลมที่ประเมิน', unit:'m/s', hint:'ไม่ใส่ถ้าไม่ตรวจ'},
+  {k:'windLimit', label:'ลมสูงสุดที่ยอมให้ยก', unit:'m/s', hint:'ดูจากคู่มือเครนหรือข้อกำหนดบริษัท'}
+];
+var F_WEIGHT = [
+  {k:'wPiece', label:'น้ำหนักชิ้นงาน', unit:'kg'},
+  {k:'wHook', label:'รอกใหญ่ + Hook', unit:'kg'},
+  {k:'wSling', label:'สลิง', unit:'kg'},
+  {k:'wBeam', label:'คานช่วยยก', unit:'kg'},
+  {k:'wOther', label:'น้ำหนักอื่น', unit:'kg'},
+  {k:'loadL', label:'ขนาดชิ้นงาน ยาว (ใช้ในภาพ 3D)', unit:'m'},
+  {k:'loadW', label:'ขนาดชิ้นงาน กว้าง (ใช้ในภาพ 3D)', unit:'m'}
+];
+var F_CAPCOMMON = [
+  {k:'limit', label:'เกณฑ์สูงสุดของพิกัดยก', unit:'%', hint:'ค่าตั้งต้น 75% ตามแบบฟอร์มที่ใช้ ปรับตามข้อกำหนดบริษัทได้'},
+  {k:'tol', label:'เผื่อความต่างของรัศมี', unit:'m', hint:'ใช้ตรวจว่ารัศมีกับมุมบูมที่กรอกสอดคล้องกัน'}
+];
+var F_BLD = [
+  {k:'floors', label:'จำนวนชั้น', unit:'ชั้น'},
+  {k:'floorH', label:'ความสูงต่อชั้น', unit:'m'},
+  {k:'bDist', label:'ระยะจากศูนย์กลางเครนถึงหน้าอาคาร', unit:'m'},
+  {k:'bDepth', label:'ความลึกอาคารตามแนวบูม', unit:'m'},
+  {k:'bW', label:'ความกว้างอาคาร', unit:'m'},
+  {k:'clearReq', label:'ระยะพ้นขอบอาคารที่ต้องการ', unit:'m', hint:'ระยะห่างแนวบูมจากขอบอาคาร ตามข้อกำหนดหน้างาน'}
+];
+var F_PROJ = [
+  {k:'pName', label:'ชื่อโครงการ', type:'text', wide:true},
+  {k:'pContract', label:'เลขที่สัญญา', type:'text', wide:true},
+  {k:'pSite', label:'สถานที่', type:'text', wide:true},
+  {k:'pDate', label:'วันที่ทำการยก', type:'date', wide:true},
+  {k:'planner', label:'ผู้จัดทำแผน', type:'text', wide:true},
+  {k:'cCtl', label:'ผู้ควบคุมการยก', type:'text', wide:true},
+  {k:'cOp', label:'ผู้บังคับเครน', type:'text', wide:true},
+  {k:'cRig', label:'ผู้ยึดเกาะ', type:'text', wide:true},
+  {k:'cSig', label:'ผู้ให้สัญญาณ', type:'text', wide:true}
+];
+
+function buildFields(container, fields, getter, onChange){
+  container.innerHTML = '';
+  fields.forEach(function(f){
+    var wrap = document.createElement('div');
+    wrap.className = 'field' + (f.wide ? ' wide' : '');
+    var left = document.createElement('label');
+    left.textContent = f.label;
+    var inp = document.createElement('input');
+    inp.id = 'f-' + container.id + '-' + f.k;
+    left.htmlFor = inp.id;
+    if(f.hint){ var h = document.createElement('span'); h.className = 'hint'; h.textContent = f.hint; left.appendChild(h); }
+    var box = document.createElement('span'); box.className = 'inp';
+    inp.type = f.type || 'number';
+    if(inp.type === 'number'){ inp.step = 'any'; inp.inputMode = 'decimal'; }
+    inp.setAttribute('data-key', f.k);
+    inp.value = getter(f.k);
+    box.appendChild(inp);
+    if(f.unit){ var u = document.createElement('span'); u.className = 'unit'; u.textContent = f.unit; box.appendChild(u); }
+    wrap.appendChild(left); wrap.appendChild(box);
+    var rng = null;
+    if(f.slide){
+      rng = document.createElement('input'); rng.type = 'range';
+      rng.min = f.slide[0]; rng.max = f.slide[1]; rng.step = f.slide[2];
+      rng.value = getter(f.k); rng.className = 'slide';
+      rng.setAttribute('data-key', f.k); rng.setAttribute('aria-label', f.label + ' (แถบเลื่อน)');
+      wrap.appendChild(rng);
+    }
+    var handler = function(src){ return function(){
+      onChange(f.k, src.value);
+      container.querySelectorAll('[data-key="' + f.k + '"]').forEach(function(e){ if(e !== src) e.value = src.value; });
+    }; };
+    inp.addEventListener('input', handler(inp));
+    if(rng) rng.addEventListener('input', handler(rng));
+    container.appendChild(wrap);
+  });
+}
+function syncAll(){
+  document.querySelectorAll('#inputs [data-key]').forEach(function(e){
+    var k = e.getAttribute('data-key');
+    if(state[k] !== undefined) e.value = state[k];
+  });
+}
+function onField(k, v){ state[k] = v; activePreset = ''; renderPresets(); refresh(); }
+
+/* ----- พิกัดยก ----- */
+function buildCap(){
+  var box = $('sec-cap');
+  box.innerHTML =
+    '<div class="seg" role="group" aria-label="วิธีกำหนดพิกัดยก">' +
+      '<button type="button" id="cap-manual">กรอกพิกัดยกเอง</button>' +
+      '<button type="button" id="cap-chart">ใช้ตาราง Load Chart</button></div>' +
+    '<div id="cap-manual-box"><div class="field"><label for="f-rated">พิกัดยก<span class="hint">อ่านจาก Load Chart ที่รัศมีและความยาวบูมนี้</span></label>' +
+      '<span class="inp"><input type="number" id="f-rated" step="any" inputmode="decimal" data-key="rated"><span class="unit">kg</span></span></div></div>' +
+    '<div id="cap-chart-box" hidden><p class="muted small" style="margin:4px 0">กรอกคู่ รัศมี และ พิกัดยก จาก Load Chart ของความยาวบูมที่ใช้ เครื่องมือเลือกแถวที่รัศมีไม่น้อยกว่ารัศมีใช้งาน ไม่เฉลี่ยค่าให้</p>' +
+      '<div id="chart-rows"></div><div class="row" style="margin-top:6px"><button type="button" class="btn ghost sm" id="chart-add">เพิ่มแถว</button></div>' +
+      '<div class="small muted" id="chart-hint" style="margin-top:6px"></div></div>' +
+    '<div id="cap-common"></div>';
+  $('f-rated').value = state.rated;
+  $('f-rated').addEventListener('input', function(e){ onField('rated', e.target.value); });
+  $('cap-manual').addEventListener('click', function(){ state.capMode = 'manual'; activePreset = ''; renderCapMode(); renderPresets(); refresh(); });
+  $('cap-chart').addEventListener('click', function(){ state.capMode = 'chart'; activePreset = ''; if(!state.chart.length) state.chart = [{r:'', cap:''}]; renderCapMode(); renderChartRows(); renderPresets(); refresh(); });
+  $('chart-add').addEventListener('click', function(){ state.chart.push({r:'', cap:''}); renderChartRows(); });
+  buildFields($('cap-common'), F_CAPCOMMON, function(k){ return state[k]; }, onField);
+  renderCapMode(); renderChartRows();
+}
+function renderCapMode(){
+  var chart = state.capMode === 'chart';
+  $('cap-manual').setAttribute('aria-pressed', !chart);
+  $('cap-chart').setAttribute('aria-pressed', chart);
+  $('cap-manual-box').hidden = chart;
+  $('cap-chart-box').hidden = !chart;
+}
+function renderChartRows(){
+  var box = $('chart-rows');
+  var h = '<table class="chart"><thead><tr><th>รัศมี (m)</th><th>พิกัดยก (kg)</th><th></th></tr></thead><tbody>';
+  state.chart.forEach(function(r, i){
+    h += '<tr><td><input type="number" step="any" inputmode="decimal" data-i="' + i + '" data-f="r" value="' + esc(r.r) + '" aria-label="รัศมีแถวที่ ' + (i + 1) + '"></td>' +
+         '<td><input type="number" step="any" inputmode="decimal" data-i="' + i + '" data-f="cap" value="' + esc(r.cap) + '" aria-label="พิกัดยกแถวที่ ' + (i + 1) + '"></td>' +
+         '<td><button type="button" class="btn ghost sm" data-del="' + i + '" aria-label="ลบแถวที่ ' + (i + 1) + '">ลบ</button></td></tr>';
+  });
+  box.innerHTML = h + '</tbody></table>';
+  box.querySelectorAll('input[data-i]').forEach(function(inp){
+    inp.addEventListener('input', function(){ state.chart[+inp.getAttribute('data-i')][inp.getAttribute('data-f')] = inp.value; activePreset = ''; renderPresets(); refresh(); });
+    inp.addEventListener('change', function(){ state.chart.sort(function(a, b){ return num(a.r) - num(b.r); }); renderChartRows(); });
+  });
+  box.querySelectorAll('[data-del]').forEach(function(b){
+    b.addEventListener('click', function(){ state.chart.splice(+b.getAttribute('data-del'), 1); renderChartRows(); refresh(); });
+  });
+}
+function updateChartHint(c){
+  var el = $('chart-hint'); if(!el) return;
+  if(state.capMode !== 'chart'){ el.textContent = ''; return; }
+  el.textContent = c.chartMiss ? 'ยังไม่มีแถวที่รัศมีไม่น้อยกว่า ' + fmt(num(state.R)) + ' m' : 'ที่รัศมี ' + fmt(num(state.R)) + ' m ใช้พิกัดยก ' + fmt(c.rated) + ' kg';
+}
+
+/* ----- อาคาร ----- */
+function buildBld(){
+  var box = $('sec-bld');
+  box.innerHTML = '<div class="field"><label for="f-bOn">แสดงอาคารในภาพ 3D และตรวจระยะพ้นอาคาร</label><span class="inp"><input type="checkbox" id="f-bOn"></span></div><div id="bld-fields"></div>';
+  $('f-bOn').checked = !!state.bOn;
+  $('f-bOn').addEventListener('change', function(e){ state.bOn = e.target.checked; activePreset = ''; $('bld-fields').hidden = !state.bOn; renderPresets(); refresh(); });
+  buildFields($('bld-fields'), F_BLD, function(k){ return state[k]; }, onField);
+  $('bld-fields').hidden = !state.bOn;
+}
+
+/* ================= ผลลัพธ์ ================= */
+function refresh(){
+  lastCalc = calc(state);
+  renderResults(); renderSbar(); updateChartHint(lastCalc);
+  viewerSceneChanged();
+  autosave();
+}
+function renderResults(){
+  var c = lastCalc, v = finalVerdict(c);
+  var rateTxt = c.rate === null ? '—' : fmt(c.rate) + '%';
+  var barW = c.rate === null ? 0 : Math.min(c.rate, 100);
+  var limit = Math.min(Math.max(c.limit, 0), 100);
+  var barCls = c.rate === null ? 'warn' : (c.rate <= c.limit ? 'pass' : 'fail');
+  var p = ckProgress();
+  var h = '<div class="verdict ' + v.st + '"><span class="big">' + rateTxt + '</span><span><span class="vt">' + v.title + '</span><br><span class="vs">' + v.sub + '</span></span></div>';
+  h += '<div class="gauge" role="img" aria-label="Capacity ' + rateTxt + ' เกณฑ์ ' + fmt(c.limit) + '%"><div class="fill ' + barCls + '" style="width:' + barW + '%"></div><div class="mark" style="left:' + limit + '%"><span>เกณฑ์ ' + fmt(c.limit) + '%</span></div></div>';
+  h += '<dl class="kv">';
+  h += '<dt>Lifting Height</dt><dd>' + fmt(c.H) + ' m</dd>';
+  h += '<dt>น้ำหนักอุปกรณ์ช่วยยกรวม</dt><dd>' + fmt(c.rig) + ' kg</dd>';
+  h += '<dt>น้ำหนักของการยกทั้งหมด</dt><dd><strong>' + fmt(c.W) + ' kg</strong></dd>';
+  h += '<dt>พิกัดยก</dt><dd>' + (c.rated > 0 ? fmt(c.rated) + ' kg' : '—') + '</dd>';
+  h += '<dt>ยกได้สูงสุดตามเกณฑ์ ' + fmt(c.limit) + '%</dt><dd>' + (c.rated > 0 ? fmt(c.allow) + ' kg' : '—') + '</dd>';
+  h += '<dt>น้ำหนักชิ้นงานสูงสุดที่ยกได้</dt><dd>' + (c.rated > 0 ? fmt(Math.max(c.maxPiece, 0)) + ' kg' : '—') + '</dd>';
+  h += '<dt>' + (c.remaining >= 0 ? 'เหลือก่อนถึงเกณฑ์' : 'เกินเกณฑ์อยู่') + '</dt><dd>' + (c.rated > 0 ? fmt(Math.abs(c.remaining)) + ' kg' : '—') + '</dd>';
+  h += '<dt>Checklist ก่อนยก</dt><dd>' + p.done + ' / ' + p.total + '</dd></dl>';
+  if(c.ratedNote) h += '<p class="muted small" style="margin:8px 0 0">' + c.ratedNote + '</p>';
+  h += '<h3>ผลตรวจ</h3><ul class="checks">';
+  c.checks.forEach(function(k){ h += '<li><span class="badge ' + k.st + '">' + STATUS_TEXT[k.st] + '</span><span class="name">' + k.name + '</span><span class="msg">' + k.msg + '</span></li>'; });
+  h += '</ul><div class="row"><button class="btn" id="btn-sheet">เปิดใบแผนการยก</button><button class="btn ghost" id="btn-add">เพิ่มเข้าตารางเปรียบเทียบ</button></div><p class="muted small" id="msg" style="margin:8px 0 0" role="status"></p>';
+  $('results').innerHTML = h;
+  $('btn-sheet').addEventListener('click', function(){ showTab('sheet'); });
+  $('btn-add').addEventListener('click', addCase);
+}
+function renderSbar(){
+  var c = lastCalc, v = finalVerdict(c);
+  $('sbar').innerHTML = '<span><span class="badge ' + v.st + '">' + v.title + '</span></span><span class="small">Capacity <strong>' + (c.rate === null ? '—' : fmt(c.rate) + '%') + '</strong></span>';
+}
+function say(t){ var m = $('msg'); if(m) m.textContent = t; }
+function addCase(){
+  userCases.push({id:'u' + Date.now(), label:state.name || 'แผนใหม่', data:JSON.parse(JSON.stringify(state))});
+  saveCases(); say('เพิ่มเข้าตารางเปรียบเทียบแล้ว');
+}
+
+/* ================= สรุปข้อความและใบแผน ================= */
+function summaryText(){
+  var c = lastCalc, v = finalVerdict(c);
+  var lines = [
+    'แผนการยก: ' + (state.name || '(ไม่ระบุชื่องาน)'),
+    'โครงการ: ' + (state.pName || '-') + ' สถานที่: ' + (state.pSite || '-') + ' วันที่: ' + (state.pDate || '-'),
+    'เครน: ' + (state.crane || '-'),
+    'Working radius ' + fmt(num(state.R)) + ' m, ความยาวบูม ' + fmt(num(state.L)) + ' m, องศาบูม ' + fmt(num(state.theta)) + ' องศา',
+    'Lifting Height ' + fmt(c.H) + ' m',
+    'น้ำหนักของการยกทั้งหมด ' + fmt(c.W) + ' kg, พิกัดยก ' + (c.rated > 0 ? fmt(c.rated) + ' kg' : '-'),
+    'Capacity ' + (c.rate === null ? '-' : fmt(c.rate) + '%') + ' (เกณฑ์ไม่เกิน ' + fmt(c.limit) + '%)',
+    'สถานะ: ' + v.title + ' (' + v.sub + ')'
+  ];
+  c.checks.forEach(function(k){ lines.push('- ' + k.name + ': ' + STATUS_TEXT[k.st] + ' ' + k.msg); });
+  return lines.join('\n');
+}
+function copySummary(){
+  var text = summaryText();
+  var fb = function(){ $('copy-fallback').hidden = false; var ta = $('copy-text'); ta.value = text; ta.focus(); ta.select(); };
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ $('print-msg').textContent = 'คัดลอกแล้ว'; }, fb);
+    else fb();
+  } catch(e){ fb(); }
+}
+function renderSheet(){
+  var c = lastCalc, v = finalVerdict(c);
+  var s = state;
+  var h = '<h2>แผนการยก (Lifting Plan)</h2>';
+  h += '<div style="margin-bottom:8px">' + esc(s.pName || 'ไม่ระบุโครงการ') + (s.pContract ? ' · สัญญาเลขที่ ' + esc(s.pContract) : '') + '</div>';
+  h += '<table><tr><th>งาน</th><td>' + esc(s.name || '-') + '</td><th>วันที่ทำการยก</th><td>' + esc(s.pDate || '-') + '</td></tr>';
+  h += '<tr><th>สถานที่</th><td>' + esc(s.pSite || '-') + '</td><th>เครน</th><td>' + esc(s.crane || '-') + '</td></tr></table>';
+  h += '<p>สถานะ: <span class="st ' + v.st + '">' + v.title + '</span> · ' + esc(v.sub) + '</p>';
+  if(lastSnap) h += '<img alt="ภาพจำลองการยก" src="' + lastSnap + '">';
+  h += '<table><tr><th colspan="2">ข้อมูลการยก</th><th colspan="2">น้ำหนักที่ยก</th></tr>';
+  h += '<tr><td>Working radius</td><td class="r">' + fmt(num(s.R)) + ' m</td><td>น้ำหนักชิ้นงาน</td><td class="r">' + fmt(num(s.wPiece)) + ' kg</td></tr>';
+  h += '<tr><td>ความยาวบูม</td><td class="r">' + fmt(num(s.L)) + ' m</td><td>รอกใหญ่ + Hook</td><td class="r">' + fmt(num(s.wHook)) + ' kg</td></tr>';
+  h += '<tr><td>องศาบูม</td><td class="r">' + fmt(num(s.theta)) + '°</td><td>สลิง</td><td class="r">' + fmt(num(s.wSling)) + ' kg</td></tr>';
+  h += '<tr><td>ความสูงจุดที่วาง</td><td class="r">' + fmt(num(s.zPlace)) + ' m</td><td>คานช่วยยก + อื่นๆ</td><td class="r">' + fmt(num(s.wBeam) + num(s.wOther)) + ' kg</td></tr>';
+  h += '<tr><td>Lifting Height (ต่ำสุด)</td><td class="r">' + fmt(c.H) + ' m</td><td><strong>น้ำหนักของการยกทั้งหมด</strong></td><td class="r"><strong>' + fmt(c.W) + ' kg</strong></td></tr>';
+  h += '<tr><td>พิกัดยก</td><td class="r">' + (c.rated > 0 ? fmt(c.rated) + ' kg' : '-') + '</td><td><strong>Capacity</strong> (ไม่เกิน ' + fmt(c.limit) + '%)</td><td class="r"><strong>' + (c.rate === null ? '-' : fmt(c.rate) + '%') + '</strong></td></tr></table>';
+  h += '<h3>ผลตรวจ</h3><table>';
+  c.checks.forEach(function(k){ h += '<tr><td class="st ' + k.st + '">' + STATUS_TEXT[k.st] + '</td><td>' + k.name + '</td><td>' + k.msg + '</td></tr>'; });
+  h += '</table><h3>Checklist ก่อนยก (' + ckProgress().done + '/' + ckProgress().total + ')</h3><table>';
+  checklist.forEach(function(k){ h += '<tr><td style="width:2em">' + (k.done ? '✓' : '☐') + '</td><td>' + esc(k.t) + '</td></tr>'; });
+  h += '</table><div class="sig"><div>ผู้ควบคุมการยก: ' + esc(s.cCtl) + '</div><div>ผู้บังคับเครน: ' + esc(s.cOp) + '</div><div>ผู้ยึดเกาะ: ' + esc(s.cRig) + '</div><div>ผู้ให้สัญญาณ: ' + esc(s.cSig) + '</div><div>ผู้จัดทำแผน: ' + esc(s.planner) + '</div><div>ฝ่ายความปลอดภัย / วิศวกรผู้อนุมัติ</div></div>';
+  h += '<p style="font-size:.78rem;color:#555;margin-top:18px">เอกสารนี้สร้างจากเครื่องมือช่วยคำนวณ ค่าพิกัดยกต้องตรงกับ Load Chart ของเครนที่ใช้จริง และต้องได้รับการตรวจสอบจากผู้มีอำนาจก่อนเริ่มยก</p>';
+  $('sheet').innerHTML = h;
+}
+
+/* ================= Checklist ================= */
+function renderChecklist(){
+  var ul = $('ck-list'); ul.innerHTML = '';
+  checklist.forEach(function(it, i){
+    var li = document.createElement('li');
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'ck-' + i; cb.checked = it.done;
+    cb.addEventListener('change', function(){ it.done = cb.checked; updateCkProgress(); renderResults(); renderSbar(); });
+    var lb = document.createElement('label'); lb.htmlFor = cb.id; lb.textContent = it.t;
+    li.appendChild(cb); li.appendChild(lb);
+    if(it.custom){
+      var del = document.createElement('button'); del.className = 'btn ghost sm'; del.textContent = 'ลบ'; del.setAttribute('aria-label', 'ลบข้อ ' + it.t);
+      del.addEventListener('click', function(){ checklist.splice(i, 1); renderChecklist(); renderResults(); renderSbar(); });
+      li.appendChild(del);
+    }
+    ul.appendChild(li);
+  });
+  updateCkProgress();
+}
+function updateCkProgress(){
+  var p = ckProgress();
+  $('ck-bar').style.width = (p.total ? p.done / p.total * 100 : 0) + '%';
+  $('ck-count').textContent = 'ตรวจแล้ว ' + p.done + ' จาก ' + p.total + ' ข้อ';
+}
+
+/* ================= แผ่นเหล็ก / แผ่นรองขา ================= */
+var plate = {pl:1.2, pw:2.4, pt:5, dens:7.85, qty:4};
+var bear = {P:'', ml:1.2, mw:2.4, allow:''};
+function plateCalc(){ var vol = num(plate.pl) * num(plate.pw) * num(plate.pt) / 1000; var each = vol * num(plate.dens) * 1000; return {vol:vol, each:each, total:each * num(plate.qty)}; }
+function renderPlate(){
+  var p = plateCalc();
+  $('plate-result').innerHTML = '<dl class="kv"><dt>ปริมาตรต่อแผ่น</dt><dd>' + fmt(p.vol, 4) + ' m³</dd><dt>น้ำหนักต่อแผ่น</dt><dd>' + fmt(p.each) + ' kg</dd><dt>น้ำหนักรวม ' + fmt(num(plate.qty), 0) + ' แผ่น</dt><dd><strong>' + fmt(p.total) + ' kg</strong></dd></dl>';
+}
+function renderBear(){
+  var P = num(bear.P), A = num(bear.ml) * num(bear.mw), allow = num(bear.allow);
+  var h = '<dl class="kv"><dt>พื้นที่แผ่นรอง</dt><dd>' + fmt(A) + ' m²</dd>';
+  if(P > 0 && A > 0){
+    var q = P / A;
+    h += '<dt>แรงดันใต้แผ่นรอง</dt><dd>' + fmt(q) + ' t/m² (' + fmt(q * 9.80665, 1) + ' kPa)</dd>';
+    if(allow > 0){
+      var u = q / allow * 100;
+      h += '<dt>เทียบกับที่ดินรับได้</dt><dd>' + fmt(u) + '% <span class="badge ' + (u <= 100 ? 'pass' : 'fail') + '">' + (u <= 100 ? 'ผ่าน' : 'ไม่ผ่าน') + '</span></dd><dt>พื้นที่แผ่นรองขั้นต่ำ</dt><dd>' + fmt(P / allow) + ' m²</dd>';
+    } else h += '<dt>เทียบกับที่ดินรับได้</dt><dd>ใส่ค่าที่ดินรับได้</dd>';
+  } else h += '<dt>แรงดันใต้แผ่นรอง</dt><dd>ใส่แรงที่ขายัน</dd>';
+  $('bear-result').innerHTML = h + '</dl>';
+}
+function sendPlate(key){
+  state[key] = Math.round(plateCalc().total * 100) / 100; activePreset = '';
+  syncAll(); renderPresets(); refresh(); showTab('plan');
+}
+
+/* ================= เปรียบเทียบ ================= */
+function renderCompare(){
+  var rows = PRESETS.map(function(p){ return {id:p.id, label:p.label, data:Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), p.data), user:false}; })
+    .concat(userCases.map(function(u){ return {id:u.id, label:u.label, data:Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), u.data), user:true}; }));
+  var h = '<thead><tr><th>แผน</th><th>เครน</th><th>รัศมี (m)</th><th>Lifting Height (m)</th><th>น้ำหนักรวม (kg)</th><th>พิกัดยก (kg)</th><th>Capacity</th><th>ผลตรวจ</th><th></th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var c = calc(r.data);
+    h += '<tr><td>' + esc(r.label) + '</td><td>' + esc(r.data.crane || '-') + '</td><td>' + fmt(num(r.data.R)) + '</td><td>' + fmt(c.H) + '</td><td>' + fmt(c.W) + '</td><td>' + (c.rated > 0 ? fmt(c.rated) : '—') + '</td><td>' + (c.rate === null ? '—' : fmt(c.rate) + '%') + '</td><td><span class="badge ' + c.overall + '">' + STATUS_TEXT[c.overall] + '</span></td><td><button class="btn ghost sm" data-open="' + r.id + '">เปิด</button>' + (r.user ? ' <button class="btn ghost sm" data-del="' + r.id + '">ลบ</button>' : '') + '</td></tr>';
+  });
+  $('cmp-table').innerHTML = h + '</tbody>';
+  $('cmp-table').querySelectorAll('[data-open]').forEach(function(b){ b.addEventListener('click', function(){
+    var r = rows.filter(function(x){ return x.id === b.getAttribute('data-open'); })[0];
+    loadState(r.data, r.user ? '' : r.id); showTab('plan');
+  }); });
+  $('cmp-table').querySelectorAll('[data-del]').forEach(function(b){ b.addEventListener('click', function(){
+    userCases = userCases.filter(function(u){ return u.id !== b.getAttribute('data-del'); }); saveCases(); renderCompare();
+  }); });
+}
+function loadState(data, presetId){
+  state = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), JSON.parse(JSON.stringify(data)));
+  if(!Array.isArray(state.chart)) state.chart = [];
+  activePreset = presetId || '';
+  simT = 0; stopPlay();
+  buildAllFields(); renderPresets(); refresh(); fitCamera('iso');
+}
+
+/* ================= ตัวอย่างเริ่มต้นและแท็บ ================= */
+function renderPresets(){
+  var box = $('presets'); box.innerHTML = '';
+  PRESETS.forEach(function(p){
+    var b = document.createElement('button'); b.className = 'chip'; b.textContent = p.label; b.setAttribute('aria-pressed', activePreset === p.id);
+    b.addEventListener('click', function(){
+      var keep = {pName:state.pName, pContract:state.pContract, pSite:state.pSite, pDate:state.pDate, planner:state.planner, cCtl:state.cCtl, cOp:state.cOp, cRig:state.cRig, cSig:state.cSig};
+      loadState(Object.assign({}, JSON.parse(JSON.stringify(DEFAULTS)), p.data, keep), p.id);
+    });
+    box.appendChild(b);
+  });
+  var r = document.createElement('button'); r.className = 'chip'; r.textContent = 'เริ่มแผนใหม่ (ล้างพิกัดยก)'; r.setAttribute('aria-pressed', activePreset === 'blank');
+  r.addEventListener('click', function(){
+    var keep = {pName:state.pName, pContract:state.pContract, pSite:state.pSite, pDate:state.pDate, planner:state.planner};
+    loadState(Object.assign({}, JSON.parse(JSON.stringify(DEFAULTS)), keep), 'blank');
+  });
+  box.appendChild(r);
+}
+var TABS = ['plan', 'check', 'aux', 'cmp', 'sheet'];
+var currentTab = 'plan';
+function showTab(name){
+  if(currentTab === 'plan' && name !== 'plan') snapshot();
+  currentTab = name;
+  TABS.forEach(function(n){ $('panel-' + n).hidden = n !== name; $('tab-' + n).setAttribute('aria-selected', n === name); });
+  if(name === 'plan'){ resizeViewer(); renderViewer(); }
+  if(name === 'cmp') renderCompare();
+  if(name === 'sheet') renderSheet();
+  try { window.scrollTo(0, 0); } catch(e){}
+}
+
+/* ================= 3D ================= */
+var T = null; // THREE
+var V = {ok:false, renderer:null, scene:null, camera:null, dyn:null, upper:null, load:null, rope:null, ropeGeom:null, target:null, yaw:0.55, pitch:0.4, dist:50};
+var simT = 0, playing = false, playRaf = 0, lastTs = 0;
+var SIM_SECONDS = 12;
+
+function themeDark(){
+  var t = document.documentElement.getAttribute('data-theme');
+  if(t === 'dark') return true; if(t === 'light') return false;
+  try { return window.matchMedia('(prefers-color-scheme: dark)').matches; } catch(e){ return false; }
+}
+function disposeGroup(g){
+  g.traverse(function(o){
+    if(o.geometry) o.geometry.dispose();
+    if(o.material){ (Array.isArray(o.material) ? o.material : [o.material]).forEach(function(m){ m.dispose(); }); }
+  });
+}
+function initViewer(){
+  var host = $('viewer');
+  T = (typeof THREE !== 'undefined') ? THREE : null;
+  if(!T){ host.innerHTML = '<p class="muted" style="padding:16px">โหลดไลบรารี 3D ไม่สำเร็จ ตรวจการเชื่อมต่ออินเทอร์เน็ตแล้วเปิดหน้านี้ใหม่ ส่วนการคำนวณยังใช้งานได้ตามปกติ</p>'; $('v-play').disabled = true; return; }
+  try {
+    V.renderer = new T.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+  } catch(e){
+    host.innerHTML = '<p class="muted" style="padding:16px">อุปกรณ์นี้ไม่รองรับภาพ 3D ส่วนการคำนวณยังใช้งานได้ตามปกติ</p>'; $('v-play').disabled = true; return;
+  }
+  V.ok = true;
+  V.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  host.appendChild(V.renderer.domElement);
+  V.scene = new T.Scene();
+  V.camera = new T.PerspectiveCamera(42, 1, 0.5, 600);
+  V.target = new T.Vector3(8, 6, 0);
+  V.scene.add(new T.HemisphereLight(0xffffff, 0x6b7780, 0.85));
+  var sun = new T.DirectionalLight(0xffffff, 0.75); sun.position.set(30, 50, 25); V.scene.add(sun);
+  bindCameraControls(V.renderer.domElement);
+  if(typeof ResizeObserver !== 'undefined'){ new ResizeObserver(function(){ resizeViewer(); renderViewer(); }).observe(host); }
+  window.addEventListener('resize', function(){ resizeViewer(); renderViewer(); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(){ rebuildScene(); }); } catch(e){}
+}
+function resizeViewer(){
+  if(!V.ok) return;
+  var host = $('viewer'), w = host.clientWidth, h = host.clientHeight;
+  if(w < 2 || h < 2) return;
+  V.renderer.setSize(w, h, false);
+  V.camera.aspect = w / h; V.camera.updateProjectionMatrix();
+}
+function placeCamera(){
+  var cp = Math.cos(V.pitch);
+  V.camera.position.set(V.target.x + V.dist * cp * Math.sin(V.yaw), V.target.y + V.dist * Math.sin(V.pitch), V.target.z + V.dist * cp * Math.cos(V.yaw));
+  V.camera.lookAt(V.target);
+}
+function renderViewer(){
+  if(!V.ok || currentTab !== 'plan') return;
+  placeCamera(); V.renderer.render(V.scene, V.camera);
+}
+function snapshot(){
+  if(!V.ok) return;
+  try { var host = $('viewer'); if(host.clientWidth < 2) return; placeCamera(); V.renderer.render(V.scene, V.camera); lastSnap = V.renderer.domElement.toDataURL('image/png'); } catch(e){ lastSnap = ''; }
+}
+function fitCamera(kind){
+  if(!V.ok || !lastCalc) return;
+  var c = lastCalc;
+  var xmax = Math.max(c.Rdraw, 6) + (state.bOn ? 0 : 3);
+  if(state.bOn) xmax = Math.max(xmax, num(state.bDist) + num(state.bDepth));
+  var ymax = Math.max(c.tipH, c.H, c.Hb, 6);
+  V.target.set(xmax * 0.42, ymax * 0.38, 0);
+  var span = Math.max(xmax * 1.1, ymax * 1.3, 18);
+  V.dist = span * 1.55;
+  if(kind === 'iso'){ V.yaw = 0.6; V.pitch = 0.42; }
+  if(kind === 'side'){ V.yaw = 0; V.pitch = 0.06; }
+  if(kind === 'top'){ V.yaw = 0; V.pitch = 1.5; V.dist = span * 1.5; V.target.y = 0; }
+  renderViewer();
+}
+function bindCameraControls(el){
+  var ptrs = {}, lastPinch = 0;
+  el.addEventListener('pointerdown', function(e){ try { el.setPointerCapture(e.pointerId); } catch(x){} ptrs[e.pointerId] = {x:e.clientX, y:e.clientY}; lastPinch = 0; });
+  el.addEventListener('pointermove', function(e){
+    if(!ptrs[e.pointerId]) return;
+    var keys = Object.keys(ptrs);
+    if(keys.length === 1){
+      var p = ptrs[e.pointerId];
+      V.yaw -= (e.clientX - p.x) * 0.008;
+      V.pitch = Math.min(1.52, Math.max(0.03, V.pitch + (e.clientY - p.y) * 0.006));
+    } else if(keys.length === 2){
+      var a = ptrs[keys[0]], b = ptrs[keys[1]];
+      ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+      var a2 = ptrs[keys[0]], b2 = ptrs[keys[1]];
+      var d = Math.hypot(a2.x - b2.x, a2.y - b2.y);
+      if(lastPinch > 0) V.dist = Math.min(300, Math.max(8, V.dist * lastPinch / d));
+      lastPinch = d;
+    }
+    ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+    renderViewer();
+  });
+  function up(e){ delete ptrs[e.pointerId]; lastPinch = 0; }
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  el.addEventListener('wheel', function(e){ e.preventDefault(); V.dist = Math.min(300, Math.max(8, V.dist * Math.exp(e.deltaY * 0.001))); renderViewer(); }, {passive:false});
+  el.addEventListener('dblclick', function(){ fitCamera('iso'); });
+}
+
+function lam(color, opts){ var o = Object.assign({color:color}, opts || {}); return new T.MeshLambertMaterial(o); }
+function box(w, h, d, color, x, y, z, opts){ var m = new T.Mesh(new T.BoxGeometry(w, h, d), lam(color, opts)); m.position.set(x, y, z); return m; }
+function cyl(r, h, color, x, y, z, rotZ){ var m = new T.Mesh(new T.CylinderGeometry(r, r, h, 20), lam(color)); m.position.set(x, y, z); if(rotZ) m.rotation.z = Math.PI / 2; return m; }
+
+function rebuildScene(){
+  if(!V.ok || !lastCalc) return;
+  if(V.dyn){ V.scene.remove(V.dyn); disposeGroup(V.dyn); }
+  var c = lastCalc, dark = themeDark();
+  var dyn = new T.Group(); V.dyn = dyn;
+  var L = Math.max(num(state.L), 1), piv = Math.max(num(state.pivot), 0.5);
+  var pieceH = Math.max(num(state.pieceH), 0.2), rigH = Math.max(num(state.riggingH), 0);
+  var lL = Math.max(num(state.loadL), 0.3), lW = Math.max(num(state.loadW), 0.3);
+
+  // พื้น
+  var ground = new T.Mesh(new T.PlaneGeometry(400, 400), lam(dark ? 0x27302a : 0xb8c2b2));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; dyn.add(ground);
+  var grid = new T.GridHelper(400, 200, dark ? 0x3d4a40 : 0x9aa693, dark ? 0x323e35 : 0xa8b3a2); dyn.add(grid);
+
+  // อาคาร
+  if(state.bOn){
+    var fl = Math.max(Math.round(num(state.floors)), 1), fh = Math.max(num(state.floorH), 1), bD = Math.max(num(state.bDepth), 1), bWd = Math.max(num(state.bW), 1);
+    var bx = num(state.bDist) + bD / 2, hb = fl * fh;
+    var bg = new T.Group(); bg.position.set(bx, 0, 0);
+    for(var i = 0; i <= fl; i++) bg.add(box(bD + 0.2, 0.28, bWd + 0.2, dark ? 0x8d979e : 0xcfd4d8, 0, i * fh + 0.02, 0));
+    var walls = box(bD, hb, bWd, dark ? 0x5d7a90 : 0x8fb0c8, 0, hb / 2, 0, {transparent:true, opacity:0.32, depthWrite:false}); bg.add(walls);
+    var edges = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(bD, hb, bWd)), new T.LineBasicMaterial({color: dark ? 0xb8c4cc : 0x4d5b66}));
+    edges.position.set(0, hb / 2, 0); bg.add(edges);
+    dyn.add(bg);
+  }
+
+  // ตัวรถเครน
+  var chassis = new T.Group();
+  chassis.add(box(2.5, 0.55, 9.6, 0x39424a, 0, 0.95, 0.4));
+  chassis.add(box(2.4, 1.9, 2.1, 0xf2b90f, 0, 1.9, 4.5));
+  chassis.add(box(2.3, 0.7, 0.1, 0x9ec7e0, 0, 2.3, 5.58));
+  [-3.8, -2.4, 2.4, 3.8].forEach(function(z){ chassis.add(cyl(0.58, 0.45, 0x1c2024, 1.25, 0.58, z, true)); chassis.add(cyl(0.58, 0.45, 0x1c2024, -1.25, 0.58, z, true)); });
+  [-1, 1].forEach(function(sx){ [-3.4, 2.6].forEach(function(z){
+    chassis.add(box(3.2, 0.25, 0.32, 0x39424a, sx * 2.7, 0.65, z));
+    chassis.add(box(0.28, 0.65, 0.28, 0x39424a, sx * 4.2, 0.35, z));
+    chassis.add(box(1, 0.12, 1, 0xe07b1f, sx * 4.2, 0.06, z));
+  }); });
+  dyn.add(chassis);
+
+  // ส่วนหมุน + บูม
+  var upper = new T.Group(); V.upper = upper;
+  upper.add(cyl(1.25, 0.5, 0x59636b, 0, 1.45, 0));
+  upper.add(box(3.4, 1.0, 2.4, 0xf2b90f, -0.6, 2.05, 0));
+  upper.add(box(1.7, 1.3, 2.4, 0x59636b, -2.5, 2.1, 0));
+  upper.add(box(1.4, 1.4, 1.1, 0xf2b90f, 0.7, 2.2, 1.6));
+  upper.add(box(1.0, Math.max(piv - 1.5, 0.2), 1.5, 0xd9a30b, -0.2, 1.5 + Math.max(piv - 1.5, 0.2) / 2, 0));
+  var boom = new T.Group(); boom.position.set(0, piv, 0); boom.rotation.z = c.thDraw * Math.PI / 180; upper.add(boom);
+  var parts = [[0.38, 0.95, 0xf2b90f], [0.33, 0.72, 0xd9a30b], [0.29, 0.5, 0xf2b90f]], s0 = 0;
+  parts.forEach(function(p){ var len = L * p[0]; boom.add(box(len, p[1], p[1], p[2], s0 + len / 2, 0, 0)); s0 += len; });
+  boom.add(cyl(0.3, 0.6, 0x39424a, L, 0, 0, false));
+  dyn.add(upper);
+
+  // ชิ้นงาน + สลิง + ตะขอ
+  var load = new T.Group(); V.load = load;
+  load.add(box(lL, pieceH, lW, 0xe07b1f, 0, pieceH / 2, 0));
+  var le = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(lL, pieceH, lW)), new T.LineBasicMaterial({color: 0x5a2a05})); le.position.set(0, pieceH / 2, 0); load.add(le);
+  var hookY = pieceH + Math.max(rigH, 0.4);
+  var sp = [];
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function(q){ sp.push(0, hookY, 0, q[0] * lL / 2 * 0.85, pieceH, q[1] * lW / 2 * 0.85); });
+  var sg = new T.BufferGeometry(); sg.setAttribute('position', new T.Float32BufferAttribute(sp, 3));
+  load.add(new T.LineSegments(sg, new T.LineBasicMaterial({color: dark ? 0xe8e8e8 : 0x222222})));
+  load.add(box(0.5, 0.45, 0.5, 0x39424a, 0, hookY + 0.22, 0));
+  dyn.add(load);
+
+  // เชือกจากปลายบูมถึงตะขอ
+  var rg = new T.BufferGeometry(); rg.setAttribute('position', new T.Float32BufferAttribute([0,0,0, 0,1,0], 3)); V.ropeGeom = rg;
+  V.rope = new T.Line(rg, new T.LineBasicMaterial({color: dark ? 0xf0f0f0 : 0x111111})); dyn.add(V.rope);
+
+  // เครื่องหมายบนพื้น: จุดยก จุดวาง แนวหมุน
+  var az1 = num(state.swing) * Math.PI / 180, Rd = c.Rdraw;
+  var ringR = Math.max(lL, lW) / 2 + 3;
+  function ring(x, z, y, color){ var m = new T.Mesh(new T.RingGeometry(ringR - 0.25, ringR, 40), new T.MeshBasicMaterial({color:color, side:T.DoubleSide, transparent:true, opacity:0.75})); m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); return m; }
+  dyn.add(ring(Rd * Math.cos(az1), Rd * Math.sin(az1), 0.05, 0xd23b32));
+  var plate = box(lL + 0.8, 0.12, lW + 0.8, 0x2e9b5f, Rd, num(state.zPlace) + 0.06, 0, {transparent:true, opacity:0.7}); dyn.add(plate);
+  var pk = box(lL + 0.8, 0.1, lW + 0.8, 0xe8a317, Rd * Math.cos(az1), 0.05, Rd * Math.sin(az1), {transparent:true, opacity:0.6}); pk.rotation.y = -az1; dyn.add(pk);
+  var arc = [], steps = 36;
+  for(var j = 0; j <= steps; j++){ var a = az1 * (1 - j / steps); arc.push(Rd * Math.cos(a), 0.12, Rd * Math.sin(a)); }
+  var ag = new T.BufferGeometry(); ag.setAttribute('position', new T.Float32BufferAttribute(arc, 3));
+  dyn.add(new T.Line(ag, new T.LineBasicMaterial({color: 0xe8a317})));
+  var rl = new T.BufferGeometry(); rl.setAttribute('position', new T.Float32BufferAttribute([0, 0.12, 0, Rd, 0.12, 0], 3));
+  dyn.add(new T.Line(rl, new T.LineBasicMaterial({color: dark ? 0xffffff : 0x1b2730})));
+
+  // จุดตรวจระยะพ้นอาคาร
+  if(c.crossing){
+    var cy = piv + num(state.bDist) * Math.tan(c.thDraw * Math.PI / 180);
+    var col = c.clearance >= num(state.clearReq) ? 0x2e9b5f : (c.clearance >= 0 ? 0xe8a317 : 0xd23b32);
+    var mk = new T.Mesh(new T.SphereGeometry(0.45, 16, 12), new T.MeshBasicMaterial({color:col})); mk.position.set(num(state.bDist), cy, 0); dyn.add(mk);
+  }
+  V.scene.add(dyn);
+  applyPose();
+}
+function ease(x){ return x * x * (3 - 2 * x); }
+function poseAt(t, c){
+  var az1 = num(state.swing) * Math.PI / 180, carry = num(state.zPlace) + num(state.margin), zP = num(state.zPlace);
+  if(t < 0.3){ return {az:az1, bottom:carry * ease(t / 0.3), phase:'ยกขึ้น'}; }
+  if(t < 0.7){ return {az:az1 * (1 - ease((t - 0.3) / 0.4)), bottom:carry, phase:'หมุนบูม'}; }
+  return {az:0, bottom:carry + (zP - carry) * ease((t - 0.7) / 0.3), phase:'ลดวาง'};
+}
+function applyPose(){
+  if(!V.ok || !V.upper || !lastCalc) return;
+  var c = lastCalc, p = poseAt(simT, c);
+  V.upper.rotation.y = -p.az;
+  var cx = c.Rdraw * Math.cos(p.az), cz = c.Rdraw * Math.sin(p.az);
+  V.load.position.set(cx, p.bottom, cz); V.load.rotation.y = -p.az;
+  var hookTop = p.bottom + Math.max(num(state.pieceH), 0.2) + Math.max(num(state.riggingH), 0.4) + 0.45;
+  var tipY = Math.max(num(state.pivot), 0.5) + Math.max(num(state.L), 1) * Math.sin(c.thDraw * Math.PI / 180);
+  var arr = V.ropeGeom.attributes.position.array;
+  arr[0] = cx; arr[1] = tipY; arr[2] = cz; arr[3] = cx; arr[4] = hookTop; arr[5] = cz;
+  V.ropeGeom.attributes.position.needsUpdate = true;
+  var warn = '';
+  if(hookTop > tipY) warn = 'ปลายบูมต่ำกว่าตะขอ ตรวจความยาวและมุมบูมอีกครั้ง';
+  else if(c.thetaEff !== null && c.geomOk && Math.abs(num(state.R) - c.reach) > num(state.tol)) warn = 'ภาพวาดมุมบูมเป็น ' + fmt(c.thetaEff, 1) + '° ให้ตรงกับรัศมีที่ระบุ ซึ่งต่างจากมุม ' + fmt(num(state.theta)) + '° ที่กรอก';
+  else if(num(state.R) > num(state.L)) warn = 'รัศมีเกินความยาวบูม ภาพแสดงตามความยาวบูม';
+  var w = $('vwarn'); if(warn){ w.textContent = warn; w.hidden = false; } else w.hidden = true;
+  $('vpill').textContent = 'R ' + fmt(c.Rdraw, 1) + ' m · บูม ' + fmt(num(state.L), 1) + ' m ที่ ' + fmt(c.thDraw, 1) + '° · H ' + fmt(c.H, 1) + ' m';
+  $('v-phase').textContent = p.phase;
+  $('v-scrub').value = Math.round(simT * 1000);
+}
+function viewerSceneChanged(){
+  if(!V.ok) return;
+  rebuildScene();
+  if(!V.fitted){ V.fitted = true; fitCamera('iso'); } else renderViewer();
+}
+function stopPlay(){ playing = false; cancelAnimationFrame(playRaf); var b = $('v-play'); if(b) b.textContent = 'เล่น'; }
+function playLoop(ts){
+  if(!playing) return;
+  if(!lastTs) lastTs = ts;
+  var dt = (ts - lastTs) / 1000; lastTs = ts;
+  simT += dt / SIM_SECONDS;
+  if(simT >= 1){ simT = 1; stopPlay(); }
+  applyPose(); renderViewer();
+  if(playing) playRaf = requestAnimationFrame(playLoop);
+}
+function startPlay(){
+  if(!V.ok) return;
+  if(simT >= 1) simT = 0;
+  playing = true; lastTs = 0; $('v-play').textContent = 'หยุด';
+  playRaf = requestAnimationFrame(playLoop);
+}
+
+/* ================= เริ่มต้น ================= */
+function buildAllFields(){
+  buildFields($('sec-work'), F_WORK, function(k){ return state[k]; }, onField);
+  buildFields($('sec-geom'), F_GEOM, function(k){ return state[k]; }, onField);
+  buildFields($('sec-weight'), F_WEIGHT, function(k){ return state[k]; }, onField);
+  buildCap(); buildBld();
+  buildFields($('sec-proj'), F_PROJ, function(k){ return state[k]; }, function(k, v){ state[k] = v; autosave(); });
+}
+TABS.forEach(function(n){ $('tab-' + n).addEventListener('click', function(){ showTab(n); }); });
+$('v-play').addEventListener('click', function(){ if(playing) stopPlay(); else startPlay(); });
+$('v-reset').addEventListener('click', function(){ stopPlay(); simT = 0; applyPose(); renderViewer(); });
+$('v-scrub').addEventListener('input', function(e){ stopPlay(); simT = e.target.value / 1000; applyPose(); renderViewer(); });
+document.querySelectorAll('[data-cam]').forEach(function(b){ b.addEventListener('click', function(){ fitCamera(b.getAttribute('data-cam')); }); });
+$('ck-add').addEventListener('click', function(){ var v = $('ck-new').value.trim(); if(!v) return; checklist.push({t:v, done:false, custom:true}); $('ck-new').value = ''; renderChecklist(); renderResults(); renderSbar(); });
+$('ck-clear').addEventListener('click', function(){ checklist.forEach(function(c){ c.done = false; }); renderChecklist(); renderResults(); renderSbar(); });
+$('btn-print').addEventListener('click', function(){ try { window.print(); } catch(e){ $('print-msg').textContent = 'เบราว์เซอร์นี้ไม่เปิดหน้าพิมพ์จากหน้านี้ ให้ใช้เมนูพิมพ์ของเบราว์เซอร์แทน'; } });
+$('btn-copy2').addEventListener('click', copySummary);
+buildFields($('plate-inputs'), [
+  {k:'pl', label:'ความยาว', unit:'m'}, {k:'pw', label:'ความกว้าง', unit:'m'}, {k:'pt', label:'ความหนา', unit:'mm'},
+  {k:'dens', label:'ความหนาแน่น', unit:'t/m³', hint:'เหล็ก 7.85'}, {k:'qty', label:'จำนวน', unit:'แผ่น'}
+], function(k){ return plate[k]; }, function(k, v){ plate[k] = v; renderPlate(); });
+buildFields($('bear-inputs'), [
+  {k:'P', label:'แรงที่ขายันสูงสุด', unit:'t', hint:'จากคู่มือหรือ Range Diagram ของเครน'},
+  {k:'ml', label:'แผ่นรอง ความยาว', unit:'m'}, {k:'mw', label:'แผ่นรอง ความกว้าง', unit:'m'},
+  {k:'allow', label:'แรงดันที่ดินรับได้', unit:'t/m²', hint:'จากผู้ออกแบบหรือผลทดสอบดิน'}
+], function(k){ return bear[k]; }, function(k, v){ bear[k] = v; renderBear(); });
+$('plate-to-other').addEventListener('click', function(){ sendPlate('wOther'); });
+$('plate-to-piece').addEventListener('click', function(){ sendPlate('wPiece'); });
+
+buildAllFields(); renderPresets(); renderChecklist(); renderPlate(); renderBear();
+lastCalc = calc(state);
+initViewer();
+refresh();
+resizeViewer(); renderViewer();
+</script>
+</body>
+</html>
